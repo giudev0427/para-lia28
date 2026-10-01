@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#11101c">
+  <title>Para Lia ☕ - Universo de Café</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;700&family=Playfair+Display:ital,wght@0,500;0,700;1,400&family=Plus+Jakarta+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+  
+  <style>
+    :root {
+      color-scheme: dark;
+    }
+    * {
+      box-sizing: border-box;
+      user-select: none;
+    }
+    body, html {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: #08060d;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      color: #fff8ed;
+    }
+
+    /* Canvas full screen background */
+    #spaceCanvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+    }
+
+    /* Main UI Layer */
+    .page-layer {
+      position: relative;
+      z-index: 10;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none; /* Let pointer events pass to canvas except for card */
+    }
+
+    .interactive-element {
+      pointer-events: auto;
+    }
+
+    /* Glassmorphism Card Style */
+    .card {
+      position: relative;
+      overflow: hidden;
+      width: min(92vw, 450px);
+      max-height: 90vh;
+      overflow-y: auto;
+      padding: clamp(1.8rem, 5vw, 2.8rem) clamp(1.2rem, 5vw, 2.2rem);
+      text-align: center;
+      border: 1px solid rgba(243, 201, 143, 0.25);
+      border-radius: 2rem;
+      background: linear-gradient(145deg, rgba(35, 23, 41, 0.78), rgba(18, 14, 25, 0.88));
+      box-shadow: 0 30px 90px rgba(0, 0, 0, 0.7), 
+                  0 0 40px rgba(239, 163, 89, 0.15),
+                  inset 0 1px rgba(255, 240, 220, 0.12);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      animation: cardAppear 1.2s cubic-bezier(0.16, 1, 0.3, 1) both;
+    }
+
+    /* Custom scrollbar inside card */
+    .card::-webkit-scrollbar {
+      width: 4px;
+    }
+    .card::-webkit-scrollbar-thumb {
+      background: rgba(243, 201, 143, 0.3);
+      border-radius: 4px;
+    }
+
+    .card::before {
+      position: absolute;
+      top: -100px;
+      left: 50%;
+      width: 280px;
+      height: 200px;
+      content: "";
+      transform: translateX(-50%);
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(239, 163, 89, 0.22) 0%, transparent 70%);
+      filter: blur(40px);
+      pointer-events: none;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: .55rem;
+      padding: .45rem .95rem;
+      color: #f3c98f;
+      border: 1px solid rgba(243, 201, 143, 0.3);
+      border-radius: 999px;
+      background: rgba(243, 201, 143, 0.08);
+      font-size: .7rem;
+      font-weight: 700;
+      letter-spacing: .2em;
+      text-transform: uppercase;
+      box-shadow: 0 0 15px rgba(243, 201, 143, 0.1);
+    }
+
+    .coffee-wrap {
+      position: relative;
+      display: grid;
+      width: 130px;
+      height: 130px;
+      margin: 1.4rem auto 1.2rem;
+      place-items: center;
+    }
+
+    .orbit {
+      position: absolute;
+      inset: 0px;
+      border: 1.5px dashed rgba(246, 198, 139, 0.35);
+      border-radius: 50%;
+      animation: spin 22s linear infinite;
+    }
+
+    .orbit::before {
+      position: absolute;
+      top: 10px;
+      left: 18px;
+      width: 10px;
+      height: 10px;
+      content: "";
+      border-radius: 50%;
+      background: #f3c98f;
+      box-shadow: 0 0 18px #f3c98f, 0 0 30px #ef8e38;
+    }
+
+    .coffee-icon {
+      font-size: 4.8rem;
+      filter: drop-shadow(0 10px 25px rgba(239, 163, 89, 0.4));
+      animation: floatBob 3.8s ease-in-out infinite;
+    }
+
+    h1 {
+      margin: 0 0 .8rem;
+      color: #fff8ed;
+      font-family: 'Playfair Display', serif;
+      font-size: clamp(2.2rem, 7vw, 3rem);
+      font-weight: 700;
+      line-height: 1.1;
+      letter-spacing: -.02em;
+    }
+
+    h1 span {
+      color: #f1bd7e;
+      font-style: italic;
+      text-shadow: 0 0 20px rgba(241, 189, 126, 0.3);
+    }
+
+    .message {
+      max-width: 360px;
+      margin: 0 auto 1.5rem;
+      color: #e2d5e3;
+      font-size: 0.98rem;
+      line-height: 1.75;
+      font-weight: 400;
+    }
+
+    .handwritten-font {
+      font-family: 'Caveat', cursive;
+    }
+
+    .divider {
+      width: 60px;
+      height: 2px;
+      margin: 0 auto 1.2rem;
+      background: linear-gradient(90deg, transparent, #dca76e, transparent);
+      border-radius: 2px;
+    }
+
+    /* Overlay start screen */
+    #startOverlay {
+      position: fixed;
+      inset: 0;
+      z-index: 50;
+      background: rgba(8, 6, 13, 0.85);
+      backdrop-filter: blur(12px);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      transition: opacity 0.8s ease, visibility 0.8s ease;
+      cursor: pointer;
+    }
+
+    #startOverlay.hidden-overlay {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+    }
+
+    .pulsing-button {
+      animation: pulseGlow 2s infinite;
+    }
+
+    /* Keyframes */
+    @keyframes cardAppear {
+      from { opacity: 0; transform: translateY(30px) scale(0.95); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    @keyframes floatBob {
+      0%, 100% { transform: translateY(0) rotate(-4deg); }
+      50% { transform: translateY(-12px) rotate(4deg); }
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    @keyframes pulseGlow {
+      0%, 100% { transform: scale(1); box-shadow: 0 0 20px rgba(239, 163, 89, 0.4); }
+      50% { transform: scale(1.05); box-shadow: 0 0 35px rgba(239, 163, 89, 0.8); }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Background Animated Canvas -->
+  <canvas id="spaceCanvas"></canvas>
+
+  <!-- Start Splash Screen Overlay -->
+  <div id="startOverlay">
+    <div class="text-center p-6 max-w-sm">
+      <div class="w-20 h-20 mx-auto mb-6 rounded-full bg-amber-500/10 border border-amber-400/30 flex items-center justify-center text-4xl shadow-lg pulsing-button">
+        ☕
+      </div>
+      <h2 class="text-2xl font-serif text-amber-100 font-bold mb-2">Universo Para Lia</h2>
+      <p class="text-amber-200/70 text-sm mb-6">Un viaje de estrellas, frases dulces y café hecho solo para ti.</p>
+      <button class="px-6 py-3 rounded-full bg-gradient-to-r from-amber-600 to-amber-500 text-amber-950 font-bold text-sm tracking-wider uppercase shadow-xl hover:brightness-110 transition">
+        Toca para explorar ✦
+      </button>
+    </div>
+  </div>
+
+  <!-- Interactive Card Overlay Layer -->
+  <div class="page-layer">
+    <main class="card interactive-element">
+      
+      <div class="eyebrow">
+        <span aria-hidden="true">✦</span> Un detalle para ti
+      </div>
+
+      <div class="coffee-wrap" aria-hidden="true">
+        <div class="orbit"></div>
+        <div class="coffee-icon">☕</div>
+      </div>
+
+      <h1>Para <span>Lia</span></h1>
+
+      <p class="message">
+        El café hace más bonito el día, pero tu sonrisa hace más bonito el mundo. Que hoy esté lleno de momentos dulces y de tu bebida favorita.
+      </p>
+
+      <div class="divider" aria-hidden="true"></div>
+
+      <!-- Reproductor de Spotify Embed -->
+      <div class="mt-4 w-full max-w-sm mx-auto rounded-2xl overflow-hidden border border-amber-500/20 shadow-2xl">
+        <iframe 
+          style="border-radius:12px;" 
+          src="https://open.spotify.com/embed/track/6IPwKM3fUUzlElbvKw2sKl?utm_source=generator&theme=0" 
+          width="100%" 
+          height="152" 
+          frameBorder="0" 
+          allowfullscreen="" 
+          allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" 
+          loading="lazy">
+        </iframe> 
+      </div>
+
+      <p class="text-xs text-amber-300/40 mt-4 handwritten-font text-base">
+        ✨ Mueve el cursor o toca la pantalla para hacer interactuar las tazas en el universo.
+      </p>
+    </main>
+  </div>
+
+  <!-- JavaScript Animation Engine & Canvas System -->
+  <script>
+    window.addEventListener('load', () => {
+      const canvas = document.getElementById('spaceCanvas');
+      const ctx = canvas.getContext('2d');
+      const startOverlay = document.getElementById('startOverlay');
+
+      // Dismiss overlay on click
+      startOverlay.addEventListener('click', () => {
+        startOverlay.classList.add('hidden-overlay');
+      });
+
+      let width = canvas.width = window.innerWidth;
+      let height = canvas.height = window.innerHeight;
+
+      // Mouse tracking
+      let mouse = {
+        x: width / 2,
+        y: height / 2,
+        targetX: width / 2,
+        targetY: height / 2,
+        isHovered: false
+      };
+
+      window.addEventListener('mousemove', (e) => {
+        mouse.targetX = e.clientX;
+        mouse.targetY = e.clientY;
+        mouse.isHovered = true;
+      });
+
+      window.addEventListener('touchmove', (e) => {
+        if (e.touches.length > 0) {
+          mouse.targetX = e.touches[0].clientX;
+          mouse.targetY = e.touches[0].clientY;
+          mouse.isHovered = true;
+        }
+      });
+
+      window.addEventListener('resize', () => {
+        width = canvas.width = window.innerWidth;
+        height = canvas.height = window.innerHeight;
+        initElements();
+      });
+
+      // Frases y textos especiales en español
+      const phrases = [
+        "El café hace más bonito el día",
+        "Gracias por estar ahí",
+        "Eres única ✦",
+        "Para Lia ☕",
+        "Tu sonrisa hace más bonito el mundo",
+        "Un detalle para ti",
+        "Contigo todo sabe mejor",
+        "Un abrazo calentito",
+        "Café estelar ✨",
+        "El mundo en tu taza",
+        "Que tengas un día dulce",
+        "Un toque de magia para ti"
+      ];
+
+      // Coffee items definition using SVGs / custom drawn canvas icons & Emojis
+      const coffeeTypes = [
+        { type: 'latte', label: '☕', scale: 1.2 },
+        { type: 'moka', label: '🫖', scale: 1.1 },
+        { type: 'iced', label: '🧋', scale: 1.0 },
+        { type: 'cup', label: '☕', scale: 0.9 },
+        { type: 'star', label: '✨', scale: 0.7 }
+      ];
+
+      let stars = [];
+      let orbitingItems = [];
+      let blackHoleAngle = 0;
+
+      function initElements() {
+        // Generate Starfield
+        stars = [];
+        const starCount = Math.floor((width * height) / 3000);
+        for (let i = 0; i < starCount; i++) {
+          stars.push({
+            x: Math.random() * width,
+            y: Math.random() * height,
+            size: Math.random() * 2 + 0.5,
+            alpha: Math.random() * 0.8 + 0.2,
+            twinkleSpeed: Math.random() * 0.03 + 0.005
+          });
+        }
+
+        // Generate Orbiting Coffee Items & Phrases
+        orbitingItems = [];
+        const totalItems = 32;
+
+        for (let i = 0; i < totalItems; i++) {
+          const isText = i % 2 === 0;
+          const radius = 120 + Math.random() * (Math.max(width, height) * 0.55);
+          const angle = Math.random() * Math.PI * 2;
+          const speed = (0.001 + Math.random() * 0.0025) * (Math.random() > 0.5 ? 1 : -1);
+
+          orbitingItems.push({
+            isText: isText,
+            text: isText ? phrases[i % phrases.length] : '',
+            icon: !isText ? coffeeTypes[i % coffeeTypes.length].label : '',
+            radius: radius,
+            angle: angle,
+            speed: speed,
+            radialOffset: (Math.random() - 0.5) * 40,
+            size: isText ? (16 + Math.random() * 8) : (24 + Math.random() * 20),
+            color: isText ? (Math.random() > 0.4 ? '#f5c98b' : '#64b5f6') : '#ffffff',
+            glow: Math.random() * 15 + 10,
+            floatY: 0,
+            floatSpeed: Math.random() * 0.02 + 0.01
+          });
+        }
+      }
+
+      function drawGargantuaBlackHole(cx, cy) {
+        blackHoleAngle += 0.005;
+
+        ctx.save();
+        ctx.translate(cx, cy);
+
+        // 1. Outer Gravitational Lensing Glow
+        const outerGlow = ctx.createRadialGradient(0, 0, 80, 0, 0, 320);
+        outerGlow.addColorStop(0, 'rgba(239, 163, 89, 0.45)');
+        outerGlow.addColorStop(0.3, 'rgba(180, 90, 220, 0.25)');
+        outerGlow.addColorStop(0.6, 'rgba(40, 90, 210, 0.12)');
+        outerGlow.addColorStop(1, 'rgba(0, 0, 0, 0)');
+
+        ctx.fillStyle = outerGlow;
+        ctx.beginPath();
+        ctx.arc(0, 0, 320, 0, Math.PI * 2);
+        ctx.fill();
+
+        // 2. Cosmic Golden Accretion Disk (Back Ellipse)
+        ctx.save();
+        ctx.rotate(-0.2);
+        ctx.scale(1, 0.32);
+
+        const diskGlow = ctx.createRadialGradient(0, 0, 90, 0, 0, 260);
+        diskGlow.addColorStop(0, '#ffffff');
+        diskGlow.addColorStop(0.2, '#ffd180');
+        diskGlow.addColorStop(0.5, '#ef8e38');
+        diskGlow.addColorStop(0.8, 'rgba(180, 50, 150, 0.5)');
+        diskGlow.addColorStop(1, 'rgba(0,0,0,0)');
+
+        ctx.fillStyle = diskGlow;
+        ctx.beginPath();
+        ctx.arc(0, 0, 270, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+
+        // 3. Central Event Horizon (Black Hole Sphere)
+        ctx.fillStyle = '#05030a';
+        ctx.beginPath();
+        ctx.arc(0, 0, 95, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Photon Ring Glow Edge
+        ctx.strokeStyle = 'rgba(255, 235, 200, 0.9)';
+        ctx.lineWidth = 3;
+        ctx.shadowColor = '#f3c98f';
+        ctx.shadowBlur = 20;
+        ctx.stroke();
+
+        // 4. Accretion Disk (Front Overlay Effect)
+        ctx.save();
+        ctx.rotate(-0.2);
+        ctx.scale(1, 0.28);
+
+        const frontDiskGrad = ctx.createRadialGradient(0, 0, 100, 0, 0, 250);
+        frontDiskGrad.addColorStop(0, 'rgba(255, 255, 255, 0.9)');
+        frontDiskGrad.addColorStop(0.3, 'rgba(243, 201, 143, 0.7)');
+        frontDiskGrad.addColorStop(0.7, 'rgba(210, 100, 40, 0.3)');
+        frontDiskGrad.addColorStop(1, 'rgba(0,0,0,0)');
+
+        ctx.fillStyle = frontDiskGrad;
+        ctx.beginPath();
+        ctx.arc(0, 0, 250, 0, Math.PI); // Front half for 3D depth
+        ctx.fill();
+        ctx.restore();
+
+        ctx.restore();
+      }
+
+      function animate() {
+        // Smooth mouse position interpolation
+        mouse.x += (mouse.targetX - mouse.x) * 0.05;
+        mouse.y += (mouse.targetY - mouse.y) * 0.05;
+
+        // Clear canvas with subtle deep space trails
+        ctx.fillStyle = '#08060d';
+        ctx.fillRect(0, 0, width, height);
+
+        const centerX = width / 2;
+        const centerY = height / 2;
+
+        // Draw Stars
+        for (let i = 0; i < stars.length; i++) {
+          let s = stars[i];
+          s.alpha += Math.sin(Date.now() * s.twinkleSpeed) * 0.01;
+          const clampedAlpha = Math.max(0.1, Math.min(0.9, s.alpha));
+
+          ctx.fillStyle = `rgba(255, 248, 237, ${clampedAlpha})`;
+          ctx.beginPath();
+          ctx.arc(s.x, s.y, s.size, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        // Draw Gravitational Center
+        drawGargantuaBlackHole(centerX, centerY);
+
+        // Draw Floating Orbiting Items (Coffee Cups & Spanish Messages)
+        orbitingItems.forEach((item) => {
+          item.angle += item.speed;
+          item.floatY += item.floatSpeed;
+
+          // Orbit coords
+          let currentRadius = item.radius + Math.sin(item.floatY) * 15;
+          let x = centerX + Math.cos(item.angle) * currentRadius;
+          let y = centerY + Math.sin(item.angle) * (currentRadius * 0.55); // Inclined ellipse perspective
+
+          // Mouse attraction / deflection interaction
+          let dx = mouse.x - x;
+          let dy = mouse.y - y;
+          let dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist < 180) {
+            let force = (180 - dist) / 180;
+            x -= (dx / dist) * force * 35;
+            y -= (dy / dist) * force * 35;
+          }
+
+          ctx.save();
+          ctx.translate(x, y);
+
+          if (item.isText) {
+            // Draw Floating Glowing Text
+            ctx.font = `700 ${item.size}px 'Caveat', cursive`;
+            ctx.fillStyle = item.color;
+            ctx.shadowColor = item.color;
+            ctx.shadowBlur = item.glow;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(item.text, 0, 0);
+          } else {
+            // Draw Coffee Icons / Tazas
+            ctx.font = `${item.size}px sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.shadowColor = 'rgba(243, 201, 143, 0.8)';
+            ctx.shadowBlur = 18;
+            ctx.fillText(item.icon, 0, 0);
+          }
+
+          ctx.restore();
+        });
+
+        requestAnimationFrame(animate);
+      }
+
+      initElements();
+      animate();
+    });
+  </script>
+</body>
+</html>

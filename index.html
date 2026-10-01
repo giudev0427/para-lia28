@@ -302,6 +302,13 @@
       line-height: 1;
       filter: drop-shadow(0 0 14px rgba(230, 156, 87, .55));
     }
+    /* tazas flotantes adicionales */
+    .orb--cup > span {
+      font-size: clamp(1.3rem, 3.9vw, 1.8rem);
+      filter:
+        drop-shadow(0 0 14px rgba(230, 156, 87, .5))
+        drop-shadow(0 6px 14px rgba(0, 0, 0, .45));
+    }
 
     /* ============================================================
        3. TARJETA GLASSMORPHISM
@@ -510,6 +517,7 @@
     @media (max-width: 380px) {
       .spotify iframe { height: 120px; }
       .coffee { font-size: 3.2rem; }
+      .orb--cup > span { font-size: 1.1rem; }
     }
 
     /* ============================================================
@@ -850,8 +858,9 @@
 
     /* ---- taza, granos y destellos orbitando el disco ---- */
     function buildOrbiters() {
-      var glyphs = ['cup', 'cup', 'bean', 'star', 'cup', 'bean', 'star'];
-      var count = TINY ? 7 : SMALL ? 10 : 14;
+      var glyphs = ['cup', 'cup', 'bean', 'cup', 'star', 'cup', 'bean',
+                    'cup', 'cup', 'star', 'cup', 'bean', 'cup'];
+      var count = TINY ? 10 : SMALL ? 15 : 22;
       orbiters.length = 0;
       for (var i = 0; i < count; i++) {
         orbiters.push({
@@ -863,6 +872,24 @@
           jit: rand(0, Math.PI * 2)
         });
       }
+
+      // dos tazas protagonistas: una grande y una mediana, con vapor
+      var bsBig = TINY ? 52 : SMALL ? 62 : 72;
+      var bsMid = TINY ? 34 : SMALL ? 40 : 46;
+      orbiters.push({
+        kind: 'cupBig', big: true, steam: true, bs: bsBig, s: 1.35,
+        r: rand(3.2, 3.55),
+        a: rand(0, Math.PI * 2),
+        w: -0.000085,
+        jit: rand(0, Math.PI * 2)
+      });
+      orbiters.push({
+        kind: 'cup', big: true, steam: true, bs: bsMid, s: 1.1,
+        r: rand(2.05, 2.6),
+        a: rand(0, Math.PI * 2),
+        w: 0.00014,
+        jit: rand(0, Math.PI * 2)
+      });
     }
 
     /* ---- fondo pre-renderizado: nebulosas + viñeta (un solo blit) ---- */
@@ -940,6 +967,26 @@
       c.shadowBlur = 14;
       c.fillText('\u2615', S / 2, S / 2);
       sprites.cup = cup;
+
+      // taza grande: sprite propio con halo cálido y brillo suave
+      var B = 256;
+      var big = document.createElement('canvas');
+      big.width = big.height = B;
+      var bgc = big.getContext('2d');
+      var hg = bgc.createRadialGradient(B / 2, B / 2, 0, B / 2, B / 2, B / 2);
+      hg.addColorStop(0, 'rgba(255,244,228,0.30)');
+      hg.addColorStop(0.26, 'rgba(243,201,143,0.20)');
+      hg.addColorStop(0.52, 'rgba(230,156,87,0.08)');
+      hg.addColorStop(1, 'rgba(230,156,87,0)');
+      bgc.fillStyle = hg;
+      bgc.fillRect(0, 0, B, B);
+      bgc.font = '156px "Segoe UI Emoji","Apple Color Emoji","Noto Color Emoji",sans-serif';
+      bgc.textAlign = 'center';
+      bgc.textBaseline = 'middle';
+      bgc.shadowColor = 'rgba(255,214,160,0.95)';
+      bgc.shadowBlur = 24;
+      bgc.fillText('\u2615', B / 2, B / 2 + 10);
+      sprites.cupBig = big;
 
       var bean = document.createElement('canvas');
       bean.width = bean.height = S;
@@ -1145,6 +1192,7 @@
         var x = cx + ex * cos - ey * sin;
         var y = cy + ex * sin + ey * cos;
         var scale = (0.62 + depth * 0.6) * o.s;
+        if (o.big) scale *= 1 + 0.06 * Math.sin(t * 0.0011 + o.jit);
         var alpha = (0.2 + depth * 0.75) * (0.85 + 0.15 * Math.sin(t * 0.0015 + o.jit));
 
         ctx.save();
@@ -1152,9 +1200,36 @@
         ctx.rotate(TILT);
         ctx.globalAlpha = clamp(alpha, 0, 1);
         var sp = sprites[o.kind] || sprites.cup;
-        var size = 30 * scale;
+        var size = (o.bs || 30) * scale;
         ctx.drawImage(sp, -size / 2, -size / 2, size, size);
         ctx.restore();
+
+        // vapor saliendo de las tazas protagonistas
+        if (o.steam) drawSteam(x, y, size, t, o.jit);
+      }
+      ctx.restore();
+      ctx.globalAlpha = 1;
+    }
+
+    /* dos hilitos de vapor que suben desde la taza grande */
+    function drawSteam(x, y, size, t, ph) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.strokeStyle = 'rgba(255,244,228,0.7)';
+      ctx.lineCap = 'round';
+      ctx.lineWidth = Math.max(1, size * 0.028);
+      var top = y - size * 0.3;
+      for (var i = 0; i < 2; i++) {
+        var p = (t * 0.00028 + i * 0.5 + ph) % 1;
+        var rise = -size * (0.05 + p * 0.5);
+        var sway = Math.sin(p * 3.4 + i * 2.2) * size * 0.11;
+        ctx.globalAlpha = 0.26 * (1 - p) * (1 - p);
+        ctx.beginPath();
+        ctx.moveTo(x + sway - size * 0.06, top + rise);
+        ctx.quadraticCurveTo(
+          x + sway + size * 0.07, top + rise - size * 0.13,
+          x + sway, top + rise - size * 0.26);
+        ctx.stroke();
       }
       ctx.restore();
       ctx.globalAlpha = 1;
@@ -1194,7 +1269,12 @@
       { glyph: '☕', rx: 0.51, ry: 0.42, w: 0.00014, ph: 3.1 },
       { glyph: '✨', rx: 0.45, ry: 0.31, w: -0.00023, ph: 4.4 },
       { glyph: '🫘', rx: 0.52, ry: 0.47, w: 0.00016, ph: 1.9 },
-      { glyph: '💫', rx: 0.38, ry: 0.28, w: -0.00012, ph: 5.6 }
+      { glyph: '💫', rx: 0.38, ry: 0.28, w: -0.00012, ph: 5.6 },
+      // más tazas flotando
+      { glyph: '☕', rx: 0.35, ry: 0.57, w: 0.00011, ph: 2.2, cls: 'orb--cup' },
+      { glyph: '☕', rx: 0.58, ry: 0.29, w: -0.00009, ph: 6.1, cls: 'orb--cup' },
+      { glyph: '☕', rx: 0.44, ry: 0.63, w: 0.00013, ph: 3.7, cls: 'orb--cup' },
+      { glyph: '☕', rx: 0.57, ry: 0.56, w: -0.00010, ph: 1.4, cls: 'orb--cup' }
     ];
 
     var orbs = [];
@@ -1215,7 +1295,7 @@
 
       GLYPHS.forEach(function (g) {
         var el = document.createElement('div');
-        el.className = 'orb orb--glyph';
+        el.className = 'orb orb--glyph' + (g.cls ? ' ' + g.cls : '');
         var span = document.createElement('span');
         span.textContent = g.glyph;
         el.appendChild(span);

@@ -470,6 +470,15 @@
       width: 100%;
       border: 0;
     }
+    .player-hint {
+      margin: .7rem 0 0;
+      color: #a99bb0;
+      font-size: .68rem;
+      letter-spacing: .16em;
+      text-transform: uppercase;
+      opacity: .8;
+    }
+    .player-hint[hidden] { display: none; }
 
     @keyframes appear {
       from { opacity: 0; transform: translateY(22px) scale(.97); }
@@ -560,6 +569,7 @@
       <div class="spotify">
         <iframe style="border-radius:12px" src="https://open.spotify.com/embed/track/6IPwKM3fUUzlElbvKw2sKl?utm_source=generator&theme=0" width="100%" height="152" frameBorder="0" allowfullscreen="" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy"></iframe>
       </div>
+      <p class="player-hint" hidden>Toca ▶ para escuchar</p>
     </section>
   </main>
 
@@ -605,6 +615,10 @@
       splash.classList.add('is-glow');
       splash.classList.add('is-burst');
 
+      // la música empieza con este mismo toque
+      musicWanted = true;
+      playMusic();
+
       window.setTimeout(function () {
         splash.classList.add('is-leaving');
         splash.setAttribute('aria-hidden', 'true');
@@ -638,6 +652,60 @@
     });
     // Pointer Events cubren ratón, touch y lápiz (móvil / tablet / PC)
     splash.addEventListener('pointerdown', function () { start(); });
+
+    /* ------------------------------------------------------------
+       SPOTIFY — la música arranca con el mismo toque.
+       Se usa el postMessage del propio reproductor, así el iframe
+       original queda intacto (misma canción, mismo reproductor).
+       ------------------------------------------------------------ */
+    var spotifyFrame = document.querySelector('.spotify iframe');
+    var playerHint = document.querySelector('.player-hint');
+    var playerReady = false, musicWanted = false, musicHeard = false;
+
+    function showHint(on) { if (playerHint) playerHint.hidden = !on; }
+
+    function toPlayer(command) {
+      if (!spotifyFrame || !spotifyFrame.contentWindow) return false;
+      try {
+        spotifyFrame.contentWindow.postMessage({ command: command }, '*');
+        return true;
+      } catch (e) { return false; }
+    }
+
+    window.addEventListener('message', function (e) {
+      if (!spotifyFrame || e.source !== spotifyFrame.contentWindow) return;
+      var d = e.data;
+      if (!d || !d.type) return;
+      if (d.type === 'ready') {
+        playerReady = true;
+        if (musicWanted) playMusic();
+      } else if (d.type === 'playback_started' ||
+        (d.type === 'playback_update' && d.payload && d.payload.isPaused === false)) {
+        musicHeard = true;
+        showHint(false);
+      } else if (d.type === 'error') {
+        showHint(true);
+      }
+    });
+
+    function playMusic() {
+      if (!musicWanted || musicHeard) return;
+      toPlayer('play');
+      // el reproductor puede aún no estar listo: se reintenta
+      window.setTimeout(function () {
+        if (musicWanted && !musicHeard) toPlayer('play_from_start');
+      }, 1200);
+      // si el navegador bloquea el audio, se indica que puede tocarse ▶
+      window.setTimeout(function () {
+        if (!musicHeard) showHint(true);
+      }, 2800);
+    }
+
+    // enganchado desde el inicio: cuando el reproductor avisa que está
+    // listo, si Lia ya tocó, la música arranca sola
+    window.setTimeout(function () {
+      if (musicWanted && !playerReady) playMusic();
+    }, 900);
 
     /* ------------------------------------------------------------
        CANVAS
